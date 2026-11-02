@@ -2,7 +2,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
-const ODALAR = { genel: [], radyo: [] };   // son mesajlar
+const ODALAR = { genel: [], radyo: [] };   // geçmiş mesajlar
 const GECMIS = 50;
 
 const server = http.createServer((req, res) => {
@@ -17,56 +17,78 @@ const wss = new WebSocketServer({ server });
 
 const send = (ws, o) => ws.readyState === 1 && ws.send(JSON.stringify(o));
 const odadakiler = (oda) => [...wss.clients].filter(c => c.ad && c.oda === oda);
-const yayin = (oda, o) => odadakiler(oda).forEach(c => send(c, o));
-const liste = (oda) => yayin(oda, { t: 'users', users: odadakiler(oda).map(c => c.ad).sort() });
-const sistem = (oda, text) => yayin(oda, { t: 'sys', text });
 
-function odaGir(ws, oda) {
-  if (!ODALAR[oda] || ws.oda === oda) return;
-  const eski = ws.oda;
-  ws.oda = oda;
-  if (eski) { sistem(eski, ws.ad + ' ayrıldı'); liste(eski); }
-  send(ws, { t: 'hist', room: oda, msgs: ODALAR[oda] });
-  sistem(oda, ws.ad + ' katıldı');
-  liste(oda);
-}
+const yayinlaKullanicilar = (oda) => {
+  const liste = odadakiler(oda).map(c => c.ad);
+  odadakiler(oda).forEach(c => send(c, { t: 'users', users: liste }));
+};
 
 wss.on('connection', (ws) => {
-  ws.isAlive = true;
-  ws.on('pong', () => (ws.isAlive = true));
+  ws.ad = '';
+  ws.oda = 'genel';
 
-  ws.on('message', (raw) => {
-    let m; try { m = JSON.parse(raw); } catch { return; }
+  ws.on('message', (message) => {
+    try {
+      const m = JSON.parse(message);
 
-    if (m.t === 'join' && !ws.ad) {
-      const ad = String(m.name || '').trim().slice(0, 20);
-      if (ad.length < 2) return send(ws, { t: 'err', m: 'Kullanıcı adı en az 2 harf olmalı' });
-      if ([...wss.clients].some(c => c.ad && c.ad.toLowerCase() === ad.toLowerCase()))
-        return send(ws, { t: 'err', m: 'Bu isim kullanımda, başka bir isim dene' });
-      ws.ad = ad;
-      send(ws, { t: 'joined', name: ad });
-      odaGir(ws, ODALAR[m.room] ? m.room : 'genel');
-    }
-    else if (m.t === 'room' && ws.ad) odaGir(ws, m.room);
-    else if (m.t === 'msg' && ws.ad && ws.oda) {
-      const text = String(m.text || '').trim().slice(0, 500);
-      if (!text) return;
-      const msg = { t: 'msg', from: ws.ad, text, ts: Date.now() };
-      ODALAR[ws.oda].push(msg);
-      if (ODALAR[ws.oda].length > GECMIS) ODALAR[ws.oda].shift();
-      yayin(ws.oda, msg);
+      // Kullanıcı Giriş Yaptığında
+      if (m.t === 'join') {
+        const isimAlindiMi = [...wss.clients].some(c => c.ad && c.ad.toLowerCase() === m.name.trim().toLowerCase());
+        if (isimAlindiMi) {
+          return send(ws, { t: 'err', m: 'Bu kullanıcı adı zaten alınmış.' });
+        }
+        ws.ad = m.name.trim().substring(0, 20);
+        ws.oda = m.room || 'genel';
+        
+        send(ws, { t: 'joined', name: ws.ad });
+        send(ws, { t: 'hist', msgs: ODALAR[ws.oda] || [] });
+        
+        odadakiler(ws.oda).forEach(c => {
+          if (c !== ws) send(c, { t: 'sys', text: `${ws.ad} sohbete katıldı.` });
+        });
+        yayinlaKullanicilar(ws.oda);
+      }
+
+      // Mesaj Gönderildiğinde
+      else if (m.t === 'msg' && ws.ad) {
+        const yeniMesaj = { t: 'msg', from: ws.ad, text: m.text.substring(0, 500), ts: Date.now() };
+        if (!ODALAR[ws.oda]) ODALAR[ws.oda] = [];
+        ODALAR[ws.oda].push(yeniMesaj);
+        if (ODALAR[ws.oda].length > GECMIS) ODALAR[ws.oda].shift();
+
+        odadakiler(ws.oda).forEach(c => send(c, yeniMesaj));
+      }
+
+      // Oda Değiştirildiğinde
+      else if (m.t === 'room' && ws.ad && m.room !== ws.oda) {
+        const eskiOda = ws.oda;
+        odadakiler(eskiOda).forEach(c => {
+          if (c !== ws) send(c, { t: 'sys', text: `${ws.ad} odadan ayrıldı.` });
+        });
+        
+        ws.oda = m.room;
+        if (!ODALAR[ws.oda]) ODALAR[ws.oda] = [];
+        
+        send(ws, { t: 'hist', msgs: ODALAR[ws.oda] });
+        
+        odadakiler(ws.oda).forEach(c => {
+          if (c !== ws) send(c, { t: 'sys', text: `${ws.ad} odaya geldi.` });
+        });
+        
+        yayinlaKullanicilar(eskiOda);
+        yayinlaKullanicilar(ws.oda);
+      }
+    } catch (e) {
+      console.error(e);
     }
   });
 
   ws.on('close', () => {
-    if (ws.ad && ws.oda) { sistem(ws.oda, ws.ad + ' ayrıldı'); liste(ws.oda); }
+    if (ws.ad) {
+      odadakiler(ws.oda).forEach(c => send(c, { t: 'sys', text: `${ws.ad} sohbetten ayrıldı.` }));
+      yayinlaKullanicilar(ws.oda);
+    }
   });
 });
 
-// bağlantısı kopanları temizle
-setInterval(() => wss.clients.forEach(ws => {
-  if (!ws.isAlive) return ws.terminate();
-  ws.isAlive = false; ws.ping();
-}), 30000);
-
-server.listen(PORT, () => console.log('Sohbet sunucusu çalışıyor: ' + PORT));
+server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda calisiyor.`));
