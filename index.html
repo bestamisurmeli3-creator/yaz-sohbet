@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>YAZ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#101a2b;--panel:#17243b;--line:#243556;--text:#e8eefb;--muted:#8da2c8;--acc:#4fc3f7;--me:#1f4f78;color-scheme:dark;
+padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:Verdana,Tahoma,sans-serif;font-size:15px;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+button{border:0;border-radius:8px;background:var(--acc);color:#06263a;padding:10px 16px;font-weight:bold}
+input,select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+#giris{margin:auto;display:flex;flex-direction:column;gap:12px;width:min(88vw,320px);text-align:center}
+#giris h1{margin:0 0 8px}
+#hata{color:#ff8a80;min-height:1.2em;margin:0}
+#sohbet{display:none;flex:1;min-height:0;flex-direction:column}
+.ust{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--line);background:var(--panel)}
+.ust .sekme{flex:1;background:transparent;color:var(--muted);border-bottom:3px solid transparent;border-radius:0;padding:8px}
+.ust .sekme.on{color:var(--text);border-color:var(--acc)}
+.ust #kb{background:transparent;color:var(--acc);padding:8px}
+#radyo{display:none;gap:8px;padding:8px;border-bottom:1px solid var(--line);align-items:center}
+#radyo select{flex:1}
+#radyo button{padding:10px 14px}
+.orta{flex:1;min-height:0;display:flex;position:relative}
+#mesajlar{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
+.m{max-width:85%;padding:7px 10px;border-radius:10px;background:var(--panel);word-wrap:break-word;overflow-wrap:anywhere}
+.m b{color:var(--acc);margin-right:6px}
+.m.ben{align-self:flex-end;background:var(--me)}
+.m small{color:var(--muted);margin-left:6px;font-size:11px}
+.s{align-self:center;color:var(--muted);font-size:12px}
+#kisiler{display:none;position:absolute;right:0;top:0;bottom:0;width:150px;background:var(--panel);border-left:1px solid var(--line);padding:10px;overflow-y:auto}
+#kisiler h4{margin:0 0 8px;color:var(--muted);font-size:13px}
+#kisiler div{padding:3px 0}
+.yaz{display:flex;gap:8px;padding:8px;border-top:1px solid var(--line);background:var(--panel)}
+.yaz input{flex:1}
+</style>
+</head>
+<body>
+
+<div id="giris">
+  <h1>YAZ</h1>
+  <input id="ad" maxlength="20" placeholder="Kullanıcı adın" autocomplete="off">
+  <button id="gir">Sohbete gir</button>
+  <p id="hata"></p>
+</div>
+
+<div id="sohbet">
+  <div class="ust">
+    <button class="sekme on" data-o="genel">Genel</button>
+    <button class="sekme" data-o="radyo">Radyo</button>
+    <button id="kb">Kişiler (0)</button>
+  </div>
+  <div id="radyo">
+    <select id="istasyon"></select>
+    <button id="cal">Çal</button>
+  </div>
+  <div class="orta">
+    <div id="mesajlar"></div>
+    <div id="kisiler"><h4>Odadakiler</h4><div id="kl"></div></div>
+  </div>
+  <div class="yaz">
+    <input id="metin" maxlength="500" placeholder="Mesaj yaz..." autocomplete="off">
+    <button id="yolla">Gönder</button>
+  </div>
+</div>
+
+<script>
+/* ===== AYARLAR ===== */
+// Sunucu adresi. Boş bırakırsan sayfayı açtığın sunucuya bağlanır.
+// APK için buraya kendi adresini yaz, örn: 'wss://sohbetim.onrender.com'
+const SUNUCU = '';
+
+// Radyo listesi: buraya kendi güncel linklerini ekle
+const RADYOLAR = [
+  { ad: 'Örnek Radyo 1', url: 'https://ornek.com/radyo1' },
+  { ad: 'Örnek Radyo 2', url: 'https://ornek.com/radyo2' },
+];
+/* =================== */
+
+const $ = id => document.getElementById(id);
+let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
+
+RADYOLAR.forEach((r, i) => $('istasyon').add(new Option(r.ad, i)));
+
+function baglan(ad, ilk) {
+  const adres = SUNUCU || ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws = new WebSocket(adres);
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name: ad, room: oda }));
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.t === 'err') { $('hata').textContent = m.m; if (ilk) ws.close(); }
+    else if (m.t === 'joined') {
+      benim = m.name; yeniden = true;
+      $('giris').style.display = 'none'; $('sohbet').style.display = 'flex';
+    }
+    else if (m.t === 'hist') { $('mesajlar').innerHTML = ''; m.msgs.forEach(ekle); }
+    else if (m.t === 'msg') ekle(m);
+    else if (m.t === 'sys') sistem(m.text);
+    else if (m.t === 'users') kisiler(m.users);
+  };
+  ws.onclose = () => {
+    if (yeniden) { sistem('Bağlantı koptu, yeniden deneniyor...'); setTimeout(() => baglan(benim, false), 3000); }
+  };
+}
+
+function saat(ts) { return new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }); }
+function kaydir() { const k = $('mesajlar'); k.scrollTop = k.scrollHeight; }
+function ekle(m) {
+  const d = document.createElement('div');
+  d.className = 'm' + (m.from === benim ? ' ben' : '');
+  const b = document.createElement('b'); b.textContent = m.from;
+  const t = document.createElement('span'); t.textContent = m.text;
+  const s = document.createElement('small'); s.textContent = saat(m.ts);
+  d.append(b, t, s); $('mesajlar').append(d); kaydir();
+}
+function sistem(text) {
+  const d = document.createElement('div'); d.className = 's'; d.textContent = text;
+  $('mesajlar').append(d); kaydir();
+}
+function kisiler(l) {
+  $('kb').textContent = 'Kişiler (' + l.length + ')';
+  $('kl').innerHTML = '';
+  l.forEach(n => { const d = document.createElement('div'); d.textContent = n; $('kl').append(d); });
+}
+
+$('gir').onclick = () => { $('hata').textContent = ''; const a = $('ad').value.trim(); if (a) baglan(a, true); };
+$('ad').onkeydown = e => { if (e.key === 'Enter') $('gir').click(); };
+
+function yolla() {
+  const t = $('metin').value.trim();
+  if (t && ws.readyState === 1) { ws.send(JSON.stringify({ t: 'msg', text: t })); $('metin').value = ''; }
+}
+$('yolla').onclick = yolla;
+$('metin').onkeydown = e => { if (e.key === 'Enter') yolla(); };
+
+document.querySelectorAll('.sekme').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.sekme').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); oda = b.dataset.o;
+  $('radyo').style.display = oda === 'radyo' ? 'flex' : 'none';
+  ws.send(JSON.stringify({ t: 'room', room: oda }));
+});
+$('kb').onclick = () => { const k = $('kisiler'); k.style.display = k.style.display === 'block' ? 'none' : 'block'; };
+
+// Radyo: sekme değişse de çalmaya devam eder
+$('cal').onclick = () => {
+  if (calan && !calan.paused) { calan.pause(); calan.src = ''; calan = null; $('cal').textContent = 'Çal'; return; }
+  const r = RADYOLAR[$('istasyon').value]; if (!r) return;
+  calan = new Audio(r.url); calan.play().catch(() => sistem('Radyo açılamadı, linki kontrol et'));
+  $('cal').textContent = 'Durdur';
+};
+$('istasyon').onchange = () => { if (calan) { calan.pause(); calan = null; $('cal').textContent = 'Çal'; $('cal').click(); } };
+</script>
+</body>
+</html>
