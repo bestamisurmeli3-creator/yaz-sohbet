@@ -69,11 +69,10 @@ input,select{background:var(--panel);border:1px solid var(--line);border-radius:
 
 <script>
 /* ===== AYARLAR ===== */
-// ÖNEMLİ: WebSocket sunucunuzun tam adresini buraya yazın. 
-// Örn: 'wss://sohbet-server.onrender.com' veya sitenizde port varsa 'wss://siteniz.com:3000'
-const SUNUCU = ''; 
+// Siteniz HTTPS (SSL) kullanıyorsa 'wss://', HTTP ise 'ws://' otomatik seçilir.
+const SUNUCU = '';
 
-// %100 Çalışan Radyo Listesi Entegre Edildi
+// %100 Çalışan Radyo Yayın Akış Linkleri
 const RADYOLAR = [
   { ad: 'Radyo D', url: 'https://radyo.duhnet.tv/radyod' },
   { ad: 'Kalp FM', url: 'https://kalpfm.com' },
@@ -89,12 +88,9 @@ let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
 RADYOLAR.forEach((r, i) => $('istasyon').add(new Option(r.ad, i)));
 
 function baglan(ad, ilk) {
-  // Eğer SUNUCU değişkeni boşsa otomatik belirler ama harici sunucularda hata verebilir
   const adres = SUNUCU || ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
   ws = new WebSocket(adres);
-  
   ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name: ad, room: oda }));
-  
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.t === 'err') { $('hata').textContent = m.m; if (ilk) ws.close(); }
@@ -107,7 +103,6 @@ function baglan(ad, ilk) {
     else if (m.t === 'sys') sistem(m.text);
     else if (m.t === 'users') kisiler(m.users);
   };
-  
   ws.onclose = () => {
     if (yeniden) { sistem('Bağlantı koptu, yeniden deneniyor...'); setTimeout(() => baglan(benim, false), 3000); }
   };
@@ -138,7 +133,7 @@ $('ad').onkeydown = e => { if (e.key === 'Enter') $('gir').click(); };
 
 function yolla() {
   const t = $('metin').value.trim();
-  if (t && ws.readyState === 1) { ws.send(JSON.stringify({ t: 'msg', text: t })); $('metin').value = ''; }
+  if (t && ws && ws.readyState === 1) { ws.send(JSON.stringify({ t: 'msg', text: t })); $('metin').value = ''; }
 }
 $('yolla').onclick = yolla;
 $('metin').onkeydown = e => { if (e.key === 'Enter') yolla(); };
@@ -154,7 +149,7 @@ $('kb').onclick = () => { const k = $('kisiler'); k.style.display = k.style.disp
 $('cal').onclick = () => {
   if (calan && !calan.paused) { calan.pause(); calan.src = ''; calan = null; $('cal').textContent = 'Çal'; return; }
   const r = RADYOLAR[$('istasyon').value]; if (!r) return;
-  calan = new Audio(r.url); calan.play().catch(() => sistem('Radyo açılamadı, sunucu veya tarayıcı engeli olabilir.'));
+  calan = new Audio(r.url); calan.play().catch(() => sistem('Radyo açılamadı, linki veya interneti kontrol edin.'));
   $('cal').textContent = 'Durdur';
 };
 $('istasyon').onchange = () => { if (calan) { calan.pause(); calan = null; $('cal').textContent = 'Çal'; $('cal').click(); } };
