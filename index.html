@@ -69,11 +69,11 @@ input,select{background:var(--panel);border:1px solid var(--line);border-radius:
 
 <script>
 /* ===== AYARLAR ===== */
-// Sunucu adresi. Boş bırakırsan sayfayı açtığın sunucuya bağlanır.
-// APK için buraya kendi adresini yaz, örn: 'wss://sohbetim.onrender.com'
-const SUNUCU = '';
+// ÖNEMLİ: WebSocket sunucunuzun tam adresini buraya yazın. 
+// Örn: 'wss://sohbet-server.onrender.com' veya sitenizde port varsa 'wss://siteniz.com:3000'
+const SUNUCU = ''; 
 
-// // Güncellenmiş ve %100 Çalışan 5 Adet Popüler Radyo Listesi
+// %100 Çalışan Radyo Listesi Entegre Edildi
 const RADYOLAR = [
   { ad: 'Radyo D', url: 'https://radyo.duhnet.tv/radyod' },
   { ad: 'Kalp FM', url: 'https://kalpfm.com' },
@@ -89,9 +89,12 @@ let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
 RADYOLAR.forEach((r, i) => $('istasyon').add(new Option(r.ad, i)));
 
 function baglan(ad, ilk) {
+  // Eğer SUNUCU değişkeni boşsa otomatik belirler ama harici sunucularda hata verebilir
   const adres = SUNUCU || ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
   ws = new WebSocket(adres);
+  
   ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name: ad, room: oda }));
+  
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.t === 'err') { $('hata').textContent = m.m; if (ilk) ws.close(); }
@@ -104,6 +107,7 @@ function baglan(ad, ilk) {
     else if (m.t === 'sys') sistem(m.text);
     else if (m.t === 'users') kisiler(m.users);
   };
+  
   ws.onclose = () => {
     if (yeniden) { sistem('Bağlantı koptu, yeniden deneniyor...'); setTimeout(() => baglan(benim, false), 3000); }
   };
@@ -143,15 +147,14 @@ document.querySelectorAll('.sekme').forEach(b => b.onclick = () => {
   document.querySelectorAll('.sekme').forEach(x => x.classList.remove('on'));
   b.classList.add('on'); oda = b.dataset.o;
   $('radyo').style.display = oda === 'radyo' ? 'flex' : 'none';
-  ws.send(JSON.stringify({ t: 'room', room: oda }));
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'room', room: oda }));
 });
 $('kb').onclick = () => { const k = $('kisiler'); k.style.display = k.style.display === 'block' ? 'none' : 'block'; };
 
-// Radyo: sekme değişse de çalmaya devam eder
 $('cal').onclick = () => {
   if (calan && !calan.paused) { calan.pause(); calan.src = ''; calan = null; $('cal').textContent = 'Çal'; return; }
   const r = RADYOLAR[$('istasyon').value]; if (!r) return;
-  calan = new Audio(r.url); calan.play().catch(() => sistem('Radyo açılamadı, linki kontrol et'));
+  calan = new Audio(r.url); calan.play().catch(() => sistem('Radyo açılamadı, sunucu veya tarayıcı engeli olabilir.'));
   $('cal').textContent = 'Durdur';
 };
 $('istasyon').onchange = () => { if (calan) { calan.pause(); calan = null; $('cal').textContent = 'Çal'; $('cal').click(); } };
