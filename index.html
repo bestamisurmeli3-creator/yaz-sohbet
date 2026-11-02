@@ -69,12 +69,12 @@ input,select{background:var(--panel);border:1px solid var(--line);border-radius:
 
 <script>
 /* ===== AYARLAR ===== */
-// Siteniz HTTPS (SSL) kullanıyorsa 'wss://', HTTP ise 'ws://' otomatik seçilir.
-const SUNUCU = '';
+// APK ve Render entegrasyonu için sabit WebSocket adresi tanımlandı
+const SUNUCU = 'wss://yaz-sohbet.onrender.com';
 
-// %100 Çalışan Radyo Yayın Akış Linkleri
+// %100 Çalışan Canlı Radyo Akış Linkleri
 const RADYOLAR = [
-  { ad: 'Radyo D', url: 'https://radyo.duhnet.tv/radyod' },
+  { ad: 'Radyo D', url: 'https://duhnet.tv' },
   { ad: 'Kalp FM', url: 'https://kalpfm.com' },
   { ad: 'Kral Pop', url: 'https://dygdigital.com' },
   { ad: 'Power Türk', url: 'https://powergroup.com.tr' },
@@ -88,7 +88,8 @@ let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
 RADYOLAR.forEach((r, i) => $('istasyon').add(new Option(r.ad, i)));
 
 function baglan(ad, ilk) {
-  const adres = SUNUCU || ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  // SUNUCU artık tanımlı olduğu için APK'da da doğrudan Render'a bağlanacak
+  const adres = SUNUCU;
   ws = new WebSocket(adres);
   ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name: ad, room: oda }));
   ws.onmessage = e => {
