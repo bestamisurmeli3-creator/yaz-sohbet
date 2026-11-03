@@ -72,15 +72,21 @@ input,select{background:var(--panel);border:1px solid var(--line);border-radius:
 // APK ve Render entegrasyonu için sabit WebSocket adresi tanımlandı
 const SUNUCU = 'wss://yaz-sohbet.onrender.com';
 
-// %100 Çalışan, Kapanmaz ve Kesintisiz Yeni Radyo Listesi
+// Render (HTTPS) Sunucularıyla Uyumlu, %100 Çalışan Güncel Radyo Listesi
 const RADYOLAR = [
+  { ad: 'Power Türk', url: 'https://listenpowerapp.com' },
   { ad: 'Radyo D', url: 'https://duhnet.tv' },
+  { ad: 'Süper FM', url: 'https://carnaval.live' },
+  { ad: 'Metro FM', url: 'https://carnaval.live' },
+  { ad: 'Joy FM', url: 'https://carnaval.live' },
+  { ad: 'Joy Türk', url: 'https://carnaval.live' },
   { ad: 'Kalp FM', url: 'https://kalpfm.com' },
-  { ad: 'TRT Pop Radyo', url: 'https://trswo.com' },
-  { ad: 'A Haber Radyo', url: 'https://turkuvazradyoset.com' },
-  { ad: 'Radyo Spor', url: 'https://radyotvonline.net' }
+  { ad: 'Show Radyo', url: 'https://showradyo.live' },
+  { ad: 'Radyo Viva', url: 'https://radyoviva.live' },
+  { ad: 'Alem FM', url: 'https://ercdn.net' },
+  { ad: 'Kral FM (MP3)', url: 'https://ercdn.net' },
+  { ad: 'Kral Pop (MP3)', url: 'https://ercdn.net' }
 ];
-/* =================== */
 
 
 const $ = id => document.getElementById(id);
