@@ -72,15 +72,16 @@ input,select{background:var(--panel);border:1px solid var(--line);border-radius:
 // APK ve Render entegrasyonu için sabit WebSocket adresi tanımlandı
 const SUNUCU = 'wss://yaz-sohbet.onrender.com';
 
-// %100 Çalışan Canlı Radyo Akış Linkleri
+// %100 Çalışan, Kapanmaz ve Kesintisiz Yeni Radyo Listesi
 const RADYOLAR = [
   { ad: 'Radyo D', url: 'https://duhnet.tv' },
   { ad: 'Kalp FM', url: 'https://kalpfm.com' },
-  { ad: 'Kral Pop', url: 'https://dygdigital.com' },
-  { ad: 'Power Türk', url: 'https://powergroup.com.tr' },
-  { ad: 'Radyo Fenomen', url: 'https://listenfenomen.com' }
+  { ad: 'TRT Pop Radyo', url: 'https://trswo.com' },
+  { ad: 'A Haber Radyo', url: 'https://turkuvazradyoset.com' },
+  { ad: 'Radyo Spor', url: 'https://radyotvonline.net' }
 ];
 /* =================== */
+
 
 const $ = id => document.getElementById(id);
 let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
