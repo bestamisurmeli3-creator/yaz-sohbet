@@ -69,10 +69,9 @@ input,select{background:var(--panel);border:1px solid var(--line);border-radius:
 
 <script>
 /* ===== AYARLAR ===== */
-// APK ve Render entegrasyonu için sabit WebSocket adresi tanımlandı
 const SUNUCU = 'wss://yaz-sohbet.onrender.com';
 
-// Render (HTTPS) Sunucularıyla Uyumlu, %100 Çalışan Güncel Radyo Listesi
+// DOĞRUDAN SES YAYINI VEREN HTTPS UYUMLU TAM LİNKLER
 const RADYOLAR = [
   { ad: 'Power Türk', url: 'https://listenpowerapp.com' },
   { ad: 'Radyo D', url: 'https://duhnet.tv' },
@@ -84,10 +83,9 @@ const RADYOLAR = [
   { ad: 'Show Radyo', url: 'https://showradyo.live' },
   { ad: 'Radyo Viva', url: 'https://radyoviva.live' },
   { ad: 'Alem FM', url: 'https://ercdn.net' },
-  { ad: 'Kral FM (MP3)', url: 'https://ercdn.net' },
-  { ad: 'Kral Pop (MP3)', url: 'https://ercdn.net' }
+  { ad: 'Kral FM', url: 'https://ercdn.net' },
+  { ad: 'Kral Pop', url: 'https://ercdn.net' }
 ];
-
 
 const $ = id => document.getElementById(id);
 let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
@@ -95,7 +93,6 @@ let ws, benim = '', oda = 'genel', calan = null, yeniden = false;
 RADYOLAR.forEach((r, i) => $('istasyon').add(new Option(r.ad, i)));
 
 function baglan(ad, ilk) {
-  // SUNUCU artık tanımlı olduğu için APK'da da doğrudan Render'a bağlanacak
   const adres = SUNUCU;
   ws = new WebSocket(adres);
   ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name: ad, room: oda }));
